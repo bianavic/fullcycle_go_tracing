@@ -29,5 +29,10 @@ go.work.sum
 .env
 
 # Editor/IDE
-# .idea/
+.idea/
 # .vscode/
+
+**/.DS_Store
+# Build output
+bin/
+service-*/cmd/server/server

@@ -39,7 +39,6 @@ type response struct {
 	Erro       erroFlag `json:"erro"`
 }
 
-// erroFlag accepts both `true` and `"true"`: ViaCEP has returned both forms for unknown CEPs.
 type erroFlag bool
 
 func (e *erroFlag) UnmarshalJSON(b []byte) error {

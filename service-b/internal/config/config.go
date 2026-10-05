@@ -1,4 +1,3 @@
-// Package config loads and validates service-b settings from the environment.
 package config
 
 import (
@@ -12,8 +11,6 @@ import (
 	"service-b/internal/infra/weatherapi"
 )
 
-// Config holds every runtime setting of service-b. OpenTelemetry settings are
-// read by the OTel SDK itself from the standard OTEL_* variables.
 type Config struct {
 	Port              string
 	WeatherAPIKey     string

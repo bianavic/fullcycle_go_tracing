@@ -1,8 +1,8 @@
 package domain
 
+// cepLength is the number of digits in a Brazilian CEP.
 const cepLength = 8
 
-// CEP is a validated Brazilian postal code: exactly 8 ASCII digits.
 type CEP struct {
 	value string
 }

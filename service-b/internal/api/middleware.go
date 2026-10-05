@@ -18,6 +18,7 @@ const (
 	healthPath      = "/healthz"
 )
 
+// safeRequestID limits what a caller may inject into logs and headers.
 var safeRequestID = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)
 
 // RequestID assigns an ID to every request, exposes it as a response header and
@@ -57,7 +58,6 @@ func RequestID(logger *slog.Logger) func(http.Handler) http.Handler {
 	}
 }
 
-// newRequestID returns an RFC 4122 v4 UUID without an external dependency.
 func newRequestID() string {
 	var b [16]byte
 	if _, err := rand.Read(b[:]); err != nil {

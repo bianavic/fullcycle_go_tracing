@@ -27,7 +27,6 @@ func TestFromCelsius(t *testing.T) {
 	}
 }
 
-// Kelvin follows the challenge formula K = C + 273 (not 273.15).
 func TestFromCelsius_KelvinUsesIntegerOffset(t *testing.T) {
 	got := FromCelsius(25)
 	if got.K != 298 {
@@ -35,7 +34,6 @@ func TestFromCelsius_KelvinUsesIntegerOffset(t *testing.T) {
 	}
 }
 
-// A tiny negative value must not serialize as "-0".
 func TestFromCelsius_NoNegativeZero(t *testing.T) {
 	got := FromCelsius(-0.04)
 	if got.C != 0 || math.Signbit(got.C) {

@@ -9,6 +9,10 @@ import (
 	"net/http"
 	"net/url"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
+
 	"service-b/internal/domain"
 )
 
@@ -19,15 +23,15 @@ const (
 	maxBodyBytes = 64 << 10
 )
 
-// Client queries WeatherAPI for the current temperature of a city.
 type Client struct {
 	baseURL string
 	apiKey  string
 	http    *http.Client
+	tracer  trace.Tracer
 }
 
-func NewClient(baseURL, apiKey string, httpClient *http.Client) *Client {
-	return &Client{baseURL: baseURL, apiKey: apiKey, http: httpClient}
+func NewClient(baseURL, apiKey string, httpClient *http.Client, tracer trace.Tracer) *Client {
+	return &Client{baseURL: baseURL, apiKey: apiKey, http: httpClient, tracer: tracer}
 }
 
 type response struct {
@@ -37,15 +41,21 @@ type response struct {
 }
 
 func (c *Client) CurrentTempC(ctx context.Context, city string) (float64, error) {
+	ctx, span := c.tracer.Start(ctx, spanName, trace.WithSpanKind(trace.SpanKindClient))
+	defer span.End()
+	span.SetAttributes(attribute.String("city", city))
 
-	temp, err := c.fetch(ctx, city)
+	temp, err := c.fetch(ctx, span, city)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "weather lookup failed")
 		return 0, err
 	}
+	span.SetAttributes(attribute.Float64("temp_c", temp))
 	return temp, nil
 }
 
-func (c *Client) fetch(ctx context.Context, city string) (float64, error) {
+func (c *Client) fetch(ctx context.Context, span trace.Span, city string) (float64, error) {
 	u, err := url.Parse(c.baseURL)
 	if err != nil {
 		return 0, fmt.Errorf("%w: weatherapi: invalid base url", domain.ErrUpstream)
@@ -65,6 +75,7 @@ func (c *Client) fetch(ctx context.Context, city string) (float64, error) {
 		return 0, fmt.Errorf("%w: weatherapi: request failed: %w", domain.ErrUpstream, withoutURL(err))
 	}
 	defer func() { _ = resp.Body.Close() }()
+	span.SetAttributes(attribute.Int("http.response.status_code", resp.StatusCode))
 
 	if resp.StatusCode != http.StatusOK {
 		return 0, fmt.Errorf("%w: weatherapi: unexpected status %d", domain.ErrUpstream, resp.StatusCode)

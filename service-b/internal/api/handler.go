@@ -45,7 +45,6 @@ func NewHandler(uc WeatherUseCase, logger *slog.Logger) *Handler {
 	return &Handler{uc: uc, logger: logger}
 }
 
-// PostWeather handles POST /weather with body {"cep": "<8 digits>"}.
 func (h *Handler) PostWeather(w http.ResponseWriter, r *http.Request) {
 	cep, err := decodeCEP(w, r)
 	if err != nil {
@@ -90,8 +89,6 @@ func classifyDecodeError(err error) error {
 	return domain.ErrInvalidZipcode
 }
 
-// writeError maps an error to its HTTP response. The client only ever sees a
-// fixed message; details go to the log.
 func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, errBodyTooLarge):

@@ -1,24 +1,22 @@
-// Package api is the HTTP delivery layer of service-a: DTOs, handlers, the
-// router and middleware. It is the only place that knows about status codes.
 package api
 
 import (
-	"bianavic/fullcycle_go_tracing/internal/domain"
-	"bianavic/fullcycle_go_tracing/internal/usecase"
 	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
 	"net/http"
+	"service-a/internal/domain"
+	"service-a/internal/observability/requestid"
+	"service-a/internal/usecase"
 )
 
 // maxBodyBytes bounds the request body; a valid payload is ~20 bytes.
 const maxBodyBytes = 1 << 10
 
-// WeatherUseCase is the application port the handler depends on.
 type WeatherUseCase interface {
-	Execute(ctx context.Context, cep domain.CEP) (usecase.Weather, error)
+	Execute(ctx context.Context, cep domain.CEP) (usecase.Output, error)
 }
 
 type weatherRequest struct {
@@ -38,19 +36,15 @@ type errorResponse struct {
 
 var errBodyTooLarge = errors.New("request body too large")
 
-// Handler serves the weather endpoint.
 type Handler struct {
 	uc     WeatherUseCase
 	logger *slog.Logger
 }
 
-// NewHandler builds a Handler.
 func NewHandler(uc WeatherUseCase, logger *slog.Logger) *Handler {
 	return &Handler{uc: uc, logger: logger}
 }
 
-// PostWeather handles POST /weather: it validates the CEP and forwards it to
-// service-b through the use case. Body: {"cep": "<8 digits>"}.
 func (h *Handler) PostWeather(w http.ResponseWriter, r *http.Request) {
 	cep, err := decodeCEP(w, r)
 	if err != nil {
@@ -66,15 +60,12 @@ func (h *Handler) PostWeather(w http.ResponseWriter, r *http.Request) {
 
 	h.writeJSON(w, r, http.StatusOK, weatherResponse{
 		City:  out.City,
-		TempC: out.TempC,
-		TempF: out.TempF,
-		TempK: out.TempK,
+		TempC: out.Temperature.C,
+		TempF: out.Temperature.F,
+		TempK: out.Temperature.K,
 	})
 }
 
-// decodeCEP reads and validates the request body. Anything that is not a
-// single JSON object whose "cep" field is a string of exactly 8 digits yields
-// domain.ErrInvalidZipcode; an oversized body yields errBodyTooLarge.
 func decodeCEP(w http.ResponseWriter, r *http.Request) (domain.CEP, error) {
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes))
 	dec.DisallowUnknownFields()
@@ -98,8 +89,6 @@ func classifyDecodeError(err error) error {
 	return domain.ErrInvalidZipcode
 }
 
-// writeError maps an error to its HTTP response. The client only ever sees a
-// fixed message; details go to the log.
 func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, errBodyTooLarge):
@@ -109,8 +98,10 @@ func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, err error) 
 	case errors.Is(err, domain.ErrZipcodeNotFound):
 		h.writeJSON(w, r, http.StatusNotFound, errorResponse{"can not find zipcode"})
 	case errors.Is(err, domain.ErrUpstream):
+		h.logger.WarnContext(r.Context(), "upstream failure", "error", err, "request_id", requestid.FromContext(r.Context()))
 		h.writeJSON(w, r, http.StatusBadGateway, errorResponse{"upstream service unavailable"})
 	default:
+		h.logger.ErrorContext(r.Context(), "unexpected error", "error", err, "request_id", requestid.FromContext(r.Context()))
 		h.writeJSON(w, r, http.StatusInternalServerError, errorResponse{"internal server error"})
 	}
 }
@@ -119,6 +110,6 @@ func (h *Handler) writeJSON(w http.ResponseWriter, r *http.Request, status int, 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(v); err != nil {
-		h.logger.ErrorContext(r.Context(), "write response", "error", err)
+		h.logger.ErrorContext(r.Context(), "write response", "error", err, "request_id", requestid.FromContext(r.Context()))
 	}
 }

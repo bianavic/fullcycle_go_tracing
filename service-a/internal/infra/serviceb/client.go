@@ -1,9 +1,6 @@
-// Package serviceb adapts service-b's HTTP API to usecase.WeatherGateway.
 package serviceb
 
 import (
-	"bianavic/fullcycle_go_tracing/internal/domain"
-	"bianavic/fullcycle_go_tracing/internal/usecase"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -11,6 +8,10 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	"service-a/internal/domain"
+	"service-a/internal/observability/requestid"
+	"service-a/internal/usecase"
 )
 
 const (
@@ -25,7 +26,6 @@ type Client struct {
 	http    *http.Client
 }
 
-// NewClient builds a Client. The http.Client carries the request timeout.
 func NewClient(baseURL string, httpClient *http.Client) *Client {
 	return &Client{baseURL: strings.TrimRight(baseURL, "/"), http: httpClient}
 }
@@ -37,8 +37,7 @@ type weatherResponse struct {
 	TempK float64 `json:"temp_K"`
 }
 
-// GetWeather posts cep to service-b. 404 and 422 map to the matching domain
-// errors; every other failure wraps domain.ErrUpstream.
+// GetWeather posts cep to service-b.
 func (c *Client) GetWeather(ctx context.Context, cep domain.CEP) (usecase.Weather, error) {
 	payload, err := json.Marshal(struct {
 		CEP string `json:"cep"`
@@ -53,6 +52,9 @@ func (c *Client) GetWeather(ctx context.Context, cep domain.CEP) (usecase.Weathe
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
+	if id := requestid.FromContext(ctx); id != "" {
+		req.Header.Set(requestIDHeader, id)
+	}
 
 	resp, err := c.http.Do(req)
 	if err != nil {

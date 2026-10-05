@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"bianavic/fullcycle_go_tracing/internal/domain"
+	"service-a/internal/domain"
 )
 
+// Weather is the weather report returned by service-b.
 type Weather struct {
 	City  string
 	TempC float64
@@ -14,7 +15,6 @@ type Weather struct {
 	TempK float64
 }
 
-// WeatherGateway abstracts service-b.
 type WeatherGateway interface {
 	GetWeather(ctx context.Context, cep domain.CEP) (Weather, error)
 }

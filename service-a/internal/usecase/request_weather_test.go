@@ -1,10 +1,11 @@
 package usecase
 
 import (
-	"bianavic/fullcycle_go_tracing/internal/domain"
 	"context"
 	"errors"
 	"testing"
+
+	"service-a/internal/domain"
 )
 
 type fakeGateway struct {

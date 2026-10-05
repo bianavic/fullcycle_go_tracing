@@ -1,15 +1,23 @@
 package serviceb
 
 import (
-	"bianavic/fullcycle_go_tracing/internal/domain"
-	"bianavic/fullcycle_go_tracing/internal/usecase"
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel/propagation"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+
+	"service-a/internal/domain"
+	"service-a/internal/observability/requestid"
+	"service-a/internal/usecase"
 )
 
 const okBody = `{"city":"São Paulo","temp_C":28.5,"temp_F":83.3,"temp_K":301.5}`
@@ -81,6 +89,19 @@ func TestGetWeather_BaseURLTrailingSlash(t *testing.T) {
 }
 
 func TestGetWeather_ForwardsRequestID(t *testing.T) {
+	var got string
+	c := newClient(t, func(w http.ResponseWriter, r *http.Request) {
+		got = r.Header.Get("X-Request-Id")
+		_, _ = w.Write([]byte(okBody))
+	})
+
+	ctx := requestid.With(context.Background(), "req-123")
+	if _, err := c.GetWeather(ctx, mustCEP(t, "01310100")); err != nil {
+		t.Fatal(err)
+	}
+	if got != "req-123" {
+		t.Errorf("X-Request-Id = %q, want req-123", got)
+	}
 }
 
 func TestGetWeather_OmitsRequestIDWhenAbsent(t *testing.T) {
@@ -126,9 +147,29 @@ func TestGetWeather_ErrorMapping(t *testing.T) {
 }
 
 func TestGetWeather_ServerDownIsUpstream(t *testing.T) {
+	srv := httptest.NewServer(http.NotFoundHandler())
+	url := srv.URL
+	srv.Close()
+
+	_, err := NewClient(url, &http.Client{Timeout: time.Second}).GetWeather(context.Background(), mustCEP(t, "01310100"))
+	if !errors.Is(err, domain.ErrUpstream) {
+		t.Fatalf("error = %v, want ErrUpstream", err)
+	}
 }
 
 func TestGetWeather_TimeoutIsUpstream(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		select {
+		case <-r.Context().Done():
+		case <-time.After(2 * time.Second):
+		}
+	}))
+	defer srv.Close()
+
+	_, err := NewClient(srv.URL, &http.Client{Timeout: 50 * time.Millisecond}).GetWeather(context.Background(), mustCEP(t, "01310100"))
+	if !errors.Is(err, domain.ErrUpstream) {
+		t.Fatalf("error = %v, want ErrUpstream", err)
+	}
 }
 
 func TestGetWeather_ContextCancelled(t *testing.T) {
@@ -143,7 +184,35 @@ func TestGetWeather_ContextCancelled(t *testing.T) {
 }
 
 func TestGetWeather_InvalidBaseURLIsUpstream(t *testing.T) {
+	_, err := NewClient("http://bad host/\x7f", http.DefaultClient).GetWeather(context.Background(), mustCEP(t, "01310100"))
+	if !errors.Is(err, domain.ErrUpstream) {
+		t.Fatalf("error = %v, want ErrUpstream", err)
+	}
 }
 
 func TestGetWeather_PropagatesTraceContext(t *testing.T) {
+	var traceparent string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		traceparent = r.Header.Get("traceparent")
+		_, _ = io.Copy(io.Discard, r.Body)
+		_, _ = w.Write([]byte(okBody))
+	}))
+	defer srv.Close()
+
+	tp := sdktrace.NewTracerProvider()
+	defer func() { _ = tp.Shutdown(context.Background()) }()
+	httpClient := &http.Client{Transport: otelhttp.NewTransport(http.DefaultTransport,
+		otelhttp.WithTracerProvider(tp),
+		otelhttp.WithPropagators(propagation.TraceContext{}),
+	)}
+	ctx, span := tp.Tracer("test").Start(context.Background(), "root")
+	defer span.End()
+
+	if _, err := NewClient(srv.URL, httpClient).GetWeather(ctx, mustCEP(t, "01310100")); err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(traceparent, span.SpanContext().TraceID().String()) {
+		t.Errorf("traceparent = %q, want it to carry trace id %s", traceparent, span.SpanContext().TraceID())
+	}
 }

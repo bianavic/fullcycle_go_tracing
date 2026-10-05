@@ -1,4 +1,3 @@
-// Package config loads and validates service-a settings from the environment.
 package config
 
 import (
@@ -10,10 +9,8 @@ import (
 )
 
 type Config struct {
-	Port        string
-	ServiceBURL string
-	// HTTPClientTimeout bounds one call to service-b. service-b makes two
-	// sequential upstream calls, so keep this above twice its own timeout.
+	Port              string
+	ServiceBURL       string
 	HTTPClientTimeout time.Duration
 }
 

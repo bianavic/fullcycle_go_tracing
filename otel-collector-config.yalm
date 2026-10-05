@@ -1,0 +1,39 @@
+# Receives traces from service-a and service-b over OTLP and forwards them to Zipkin.
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  # First in the pipeline: protects the collector from running out of memory.
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 256
+    spike_limit_mib: 64
+
+  batch:
+    timeout: 1s
+    send_batch_size: 512
+
+exporters:
+  zipkin:
+    endpoint: http://zipkin:9411/api/v2/spans
+    format: json
+
+  # Prints a one-line summary per batch to the collector log; handy to debug.
+  debug:
+    verbosity: basic
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [zipkin, debug]
+
+  telemetry:
+    logs:
+      level: info

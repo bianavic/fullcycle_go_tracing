@@ -1,8 +1,6 @@
 package api
 
 import (
-	"bianavic/fullcycle_go_tracing/internal/domain"
-	"bianavic/fullcycle_go_tracing/internal/usecase"
 	"context"
 	"encoding/json"
 	"errors"
@@ -13,16 +11,19 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"service-a/internal/domain"
+	"service-a/internal/usecase"
 )
 
 type fakeUseCase struct {
-	out   usecase.Weather
+	out   usecase.Output
 	err   error
 	calls int
 	gotIn domain.CEP
 }
 
-func (f *fakeUseCase) Execute(_ context.Context, cep domain.CEP) (usecase.Weather, error) {
+func (f *fakeUseCase) Execute(_ context.Context, cep domain.CEP) (usecase.Output, error) {
 	f.calls++
 	f.gotIn = cep
 	return f.out, f.err
@@ -53,7 +54,10 @@ func decodeMap(t *testing.T, rec *httptest.ResponseRecorder) map[string]any {
 }
 
 func TestPostWeather_Success(t *testing.T) {
-	uc := &fakeUseCase{out: usecase.Weather{City: "São Paulo", TempC: 28.5, TempF: 83.3, TempK: 301.5}}
+	uc := &fakeUseCase{out: usecase.Output{
+		City:        "São Paulo",
+		Temperature: domain.Temperature{C: 28.5, F: 83.3, K: 301.5},
+	}}
 
 	rec := post(t, newServer(uc), `{"cep":"01310100"}`)
 
@@ -79,7 +83,7 @@ func TestPostWeather_Success(t *testing.T) {
 }
 
 func TestPostWeather_ZeroValuesAreNotOmitted(t *testing.T) {
-	uc := &fakeUseCase{out: usecase.Weather{City: "Oslo", TempC: 0, TempF: 32, TempK: 273}}
+	uc := &fakeUseCase{out: usecase.Output{City: "Oslo", Temperature: domain.Temperature{C: 0, F: 32, K: 273}}}
 	got := decodeMap(t, post(t, newServer(uc), `{"cep":"01310100"}`))
 	if v, ok := got["temp_C"]; !ok || v != 0.0 {
 		t.Errorf("temp_C = %v (present=%v), want 0 present", v, ok)

@@ -65,16 +65,18 @@ Only `8080` and `9411` are published on the host; everything else stays on the i
 
    ```bash
    cp .env.example .env
-   # edit .env and set WEATHER_API_KEY=<your key>
    ```
+
+   Then edit `.env` and set `WEATHER_API_KEY=<your key>`.
 
 3. Build and start the whole ecosystem (Service A, Service B, OTEL Collector, Zipkin)
 
    ```bash
-   docker compose up --build        # add -d to run in the background
+   docker compose up --build
    ```
 
-   `docker compose up --build --wait` returns once every container with a healthcheck is healthy.
+   Add `-d` to run it in the background; `docker compose up --build -d --wait` returns once every container with a
+   healthcheck is healthy.
 
 4. Send a request
 
@@ -144,14 +146,24 @@ Inputs that return `422 invalid zipcode`:
 | `{"cep":"29902555","x":1}`       | unknown fields are rejected                      |
 
 ```bash
-$ curl -i -X POST localhost:8080/weather -H 'Content-Type: application/json' -d '{"cep":"99999999"}'
+curl -i -X POST localhost:8080/weather -H 'Content-Type: application/json' -d '{"cep":"99999999"}'
+```
+
+```http
 HTTP/1.1 404 Not Found
 Content-Type: application/json; charset=utf-8
-X-Request-Id: 4e8604d6-c0f7-46ba-b3b4-fe86304919c3
+X-Request-Id: a8194f27-29b2-42bd-8d0a-ca9df44db077
+Date: Mon, 05 Oct 2026 18:53:53 GMT
+Content-Length: 35
 
 {"message":"can not find zipcode"}
+```
 
-$ curl -i -X POST localhost:8080/weather -H 'Content-Type: application/json' -d '{"cep":"123"}'
+```bash
+curl -i -X POST localhost:8080/weather -H 'Content-Type: application/json' -d '{"cep":"123"}'
+```
+
+```http
 HTTP/1.1 422 Unprocessable Entity
 Content-Type: application/json; charset=utf-8
 X-Request-Id: a26dc81a-e5b4-4c1c-aca9-b1090323e841
@@ -190,7 +202,8 @@ Zipkin UI: **<http://localhost:9411>**
 Spans are batched before export, so a new trace shows up in Zipkin about **5–6 seconds** after the request.
 
 **Jumping straight to the trace of one request.** Service A continues any W3C `traceparent` it receives, so you can pick
-the trace ID yourself and open it directly:
+the trace ID yourself and open it directly. Paste the whole block at once, in the same terminal (the variables only exist
+in that shell session); it works in both bash and zsh:
 
 ```bash
 TRACE_ID=$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')
@@ -200,9 +213,13 @@ curl -s -X POST http://localhost:8080/weather \
   -H 'Content-Type: application/json' \
   -H "traceparent: 00-${TRACE_ID}-${SPAN_ID}-01" \
   -d '{"cep":"29902555"}'
+echo
 
-echo "http://localhost:9411/zipkin/traces/${TRACE_ID}"   # open this after ~6 seconds
+echo "Zipkin trace: http://localhost:9411/zipkin/traces/${TRACE_ID}"
 ```
+
+Wait about 6 seconds (spans are exported in batches) and open the printed link. On macOS you can let the shell do it:
+`sleep 6 && open "http://localhost:9411/zipkin/traces/${TRACE_ID}"` (use `xdg-open` on Linux).
 
 ### What a trace looks like
 
@@ -235,8 +252,10 @@ Each service writes one JSON log line per request. The same `request_id` and `tr
 ```
 
 ```bash
-docker compose logs service-a service-b     # the first line above is service-a, the second service-b
+docker compose logs service-a service-b
 ```
+
+In the example above, the first line comes from service-a and the second from service-b.
 
 ## Configuration
 
@@ -351,12 +370,12 @@ containers, `golangci-lint`/`govulncheck` for the quality gates, and `jq` for th
 | `port is already allocated` on 8080 or 9411                  | Stop whatever uses the port, or change the host port mapping in `docker-compose.yaml`.                        |
 | Kelvin differs from the challenge's example (`301.65`)       | The challenge's formula is `K = C + 273`, which this project follows exactly; its example uses `273.15`.      |
 
-```bash
-docker compose ps                       # health of every container
-docker compose logs -f service-a        # follow one service (swap for service-b / otel-collector / zipkin)
-docker compose up --build service-a     # rebuild and restart a single service
-docker compose down -v                  # stop and remove containers and volumes
-```
+| Command                               | What it does                                                          |
+|---------------------------------------|-----------------------------------------------------------------------|
+| `docker compose ps`                   | Health of every container                                             |
+| `docker compose logs -f service-a`    | Follow one service (swap for `service-b` / `otel-collector` / `zipkin`) |
+| `docker compose up --build service-a` | Rebuild and restart a single service                                  |
+| `docker compose down -v`              | Stop and remove containers and volumes                                |
 
 ## External APIs and conversions
 
@@ -435,7 +454,6 @@ The delivery item still pending depends only on the final merge into `main`.
 
 - [x] Keep the repository dedicated to the challenge project.
 - [x] Make sure the repository contains only this project.
-- [ ] Keep all the code on the `main` branch.
 
 > **Note on Kelvin:** the brief's example shows `301.65` for 28.5 °C (that is, `C + 273.15`), but the stated formula is
 > `K = C + 273`. This project follows the **formula** (28.5 °C → `301.5`).

@@ -27,19 +27,22 @@ func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
 
-	if err := run(logger); err != nil {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	if err := run(ctx, logger, os.Getenv); err != nil {
 		logger.Error("service-b failed", "error", err)
 		os.Exit(1)
 	}
 }
 
-func run(logger *slog.Logger) error {
-	cfg, err := config.Load(os.Getenv)
+func run(ctx context.Context, logger *slog.Logger, getenv func(string) string) error {
+	cfg, err := config.Load(getenv)
 	if err != nil {
 		return err
 	}
 
-	shutdownTracing, err := telemetry.Init(context.Background(), "service-b")
+	shutdownTracing, err := telemetry.Init(ctx, "service-b")
 	if err != nil {
 		return err
 	}
@@ -71,7 +74,6 @@ func run(logger *slog.Logger) error {
 		Handler:           api.NewRouter(handler, logger),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
-		// Must outlast two sequential upstream calls plus processing.
 		WriteTimeout: 2*cfg.HTTPClientTimeout + 5*time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
@@ -84,16 +86,14 @@ func run(logger *slog.Logger) error {
 		}
 	}()
 
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	select {
 	case err := <-serverErr:
 		return err
-	case sig := <-stop:
-		logger.Info("shutting down", "signal", sig.String())
+	case <-ctx.Done():
+		logger.Info("shutting down")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	drainCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
-	return srv.Shutdown(ctx)
+	return srv.Shutdown(drainCtx)
 }

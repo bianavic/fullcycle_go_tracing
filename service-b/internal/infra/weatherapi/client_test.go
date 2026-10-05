@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -96,8 +97,6 @@ func TestCurrentTempC_Errors(t *testing.T) {
 	}
 }
 
-// The API key travels in the query string, and net/http embeds the full URL in
-// transport errors. None of that may reach the returned error.
 func TestCurrentTempC_NetworkErrorsDoNotLeakKey(t *testing.T) {
 	t.Run("connection refused", func(t *testing.T) {
 		srv := httptest.NewServer(http.NotFoundHandler())
@@ -209,5 +208,18 @@ func assertNoSecret(t *testing.T, s string) {
 	t.Helper()
 	if strings.Contains(s, testKey) || strings.Contains(strings.ToLower(s), "key=") {
 		t.Errorf("secret leaked in %q", s)
+	}
+}
+
+func TestWithoutURL(t *testing.T) {
+	inner := errors.New("connection refused")
+	wrapped := &url.Error{Op: "Get", URL: "http://x/?key=" + testKey, Err: inner}
+
+	if got := withoutURL(wrapped); got != inner {
+		t.Errorf("withoutURL(*url.Error) = %v, want the inner cause only", got)
+	}
+	plain := errors.New("plain")
+	if got := withoutURL(plain); got != plain {
+		t.Errorf("withoutURL(plain) = %v, want it unchanged", got)
 	}
 }

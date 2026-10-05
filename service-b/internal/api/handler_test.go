@@ -210,3 +210,27 @@ func TestRouter_MethodsAndPaths(t *testing.T) {
 		}
 	})
 }
+
+type brokenWriter struct{ header http.Header }
+
+func (b *brokenWriter) Header() http.Header {
+	if b.header == nil {
+		b.header = http.Header{}
+	}
+	return b.header
+}
+func (b *brokenWriter) Write([]byte) (int, error) { return 0, errors.New("broken pipe") }
+func (b *brokenWriter) WriteHeader(int)           {}
+
+func TestPostWeather_LogsWhenTheResponseCannotBeWritten(t *testing.T) {
+	var logs strings.Builder
+	logger := slog.New(slog.NewTextHandler(&logs, nil))
+	h := NewHandler(&fakeUseCase{}, logger)
+
+	req := httptest.NewRequest(http.MethodPost, "/weather", strings.NewReader(`{"cep":"01310100"}`))
+	h.PostWeather(&brokenWriter{}, req) // must not panic
+
+	if !strings.Contains(logs.String(), "write response") || !strings.Contains(logs.String(), "broken pipe") {
+		t.Errorf("expected a log line about the failed write, got %q", logs.String())
+	}
+}

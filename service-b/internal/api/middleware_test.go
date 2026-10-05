@@ -136,3 +136,15 @@ func TestRequestID_DoesNotLogHealthChecks(t *testing.T) {
 		t.Errorf("health checks must not be logged, got %q", buf.String())
 	}
 }
+
+func TestRequestID_StatusWriterUnwraps(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/x", nil)
+	var flushErr error
+	rec, _ := runMiddleware(t, req, func(w http.ResponseWriter, _ *http.Request) {
+		flushErr = http.NewResponseController(w).Flush()
+	})
+
+	if flushErr != nil || !rec.Flushed {
+		t.Errorf("Flush through the middleware: err=%v flushed=%v, want nil/true", flushErr, rec.Flushed)
+	}
+}

@@ -17,13 +17,13 @@ import (
 )
 
 type fakeUseCase struct {
-	out   usecase.Output
+	out   usecase.Weather
 	err   error
 	calls int
 	gotIn domain.CEP
 }
 
-func (f *fakeUseCase) Execute(_ context.Context, cep domain.CEP) (usecase.Output, error) {
+func (f *fakeUseCase) Execute(_ context.Context, cep domain.CEP) (usecase.Weather, error) {
 	f.calls++
 	f.gotIn = cep
 	return f.out, f.err
@@ -54,10 +54,7 @@ func decodeMap(t *testing.T, rec *httptest.ResponseRecorder) map[string]any {
 }
 
 func TestPostWeather_Success(t *testing.T) {
-	uc := &fakeUseCase{out: usecase.Output{
-		City:        "São Paulo",
-		Temperature: domain.Temperature{C: 28.5, F: 83.3, K: 301.5},
-	}}
+	uc := &fakeUseCase{out: usecase.Weather{City: "São Paulo", TempC: 28.5, TempF: 83.3, TempK: 301.5}}
 
 	rec := post(t, newServer(uc), `{"cep":"01310100"}`)
 
@@ -83,7 +80,7 @@ func TestPostWeather_Success(t *testing.T) {
 }
 
 func TestPostWeather_ZeroValuesAreNotOmitted(t *testing.T) {
-	uc := &fakeUseCase{out: usecase.Output{City: "Oslo", Temperature: domain.Temperature{C: 0, F: 32, K: 273}}}
+	uc := &fakeUseCase{out: usecase.Weather{City: "Oslo", TempC: 0, TempF: 32, TempK: 273}}
 	got := decodeMap(t, post(t, newServer(uc), `{"cep":"01310100"}`))
 	if v, ok := got["temp_C"]; !ok || v != 0.0 {
 		t.Errorf("temp_C = %v (present=%v), want 0 present", v, ok)
@@ -209,4 +206,28 @@ func TestRouter_MethodsAndPaths(t *testing.T) {
 			t.Errorf("status = %d, want 200", rec.Code)
 		}
 	})
+}
+
+type brokenWriter struct{ header http.Header }
+
+func (b *brokenWriter) Header() http.Header {
+	if b.header == nil {
+		b.header = http.Header{}
+	}
+	return b.header
+}
+func (b *brokenWriter) Write([]byte) (int, error) { return 0, errors.New("broken pipe") }
+func (b *brokenWriter) WriteHeader(int)           {}
+
+func TestPostWeather_LogsWhenTheResponseCannotBeWritten(t *testing.T) {
+	var logs strings.Builder
+	logger := slog.New(slog.NewTextHandler(&logs, nil))
+	h := NewHandler(&fakeUseCase{}, logger)
+
+	req := httptest.NewRequest(http.MethodPost, "/weather", strings.NewReader(`{"cep":"01310100"}`))
+	h.PostWeather(&brokenWriter{}, req) // must not panic
+
+	if !strings.Contains(logs.String(), "write response") || !strings.Contains(logs.String(), "broken pipe") {
+		t.Errorf("expected a log line about the failed write, got %q", logs.String())
+	}
 }

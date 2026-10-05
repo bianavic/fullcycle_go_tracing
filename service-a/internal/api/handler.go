@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+
 	"service-a/internal/domain"
 	"service-a/internal/observability/requestid"
 	"service-a/internal/usecase"
@@ -16,7 +17,7 @@ import (
 const maxBodyBytes = 1 << 10
 
 type WeatherUseCase interface {
-	Execute(ctx context.Context, cep domain.CEP) (usecase.Output, error)
+	Execute(ctx context.Context, cep domain.CEP) (usecase.Weather, error)
 }
 
 type weatherRequest struct {
@@ -45,6 +46,8 @@ func NewHandler(uc WeatherUseCase, logger *slog.Logger) *Handler {
 	return &Handler{uc: uc, logger: logger}
 }
 
+// PostWeather handles POST /weather: it validates the CEP and forwards it to
+// service-b through the use case. Body: {"cep": "<8 digits>"}.
 func (h *Handler) PostWeather(w http.ResponseWriter, r *http.Request) {
 	cep, err := decodeCEP(w, r)
 	if err != nil {
@@ -60,9 +63,9 @@ func (h *Handler) PostWeather(w http.ResponseWriter, r *http.Request) {
 
 	h.writeJSON(w, r, http.StatusOK, weatherResponse{
 		City:  out.City,
-		TempC: out.Temperature.C,
-		TempF: out.Temperature.F,
-		TempK: out.Temperature.K,
+		TempC: out.TempC,
+		TempF: out.TempF,
+		TempK: out.TempK,
 	})
 }
 

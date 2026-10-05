@@ -1,19 +1,26 @@
-# Build stage
-FROM golang:1.27.1 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.27.1-alpine3.24 AS build
 
-WORKDIR /app
+ENV GOWORK=off CGO_ENABLED=0
+WORKDIR /src
 
-COPY service-a/ ./
-
+COPY service-a/go.mod service-a/go.sum ./
 RUN go mod download
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o service-a ./cmd/server/main.go
+COPY service-a/ ./
+ARG TARGETOS
+ARG TARGETARCH
+RUN GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    go build -trimpath -ldflags="-s -w" -o /out/service-a ./cmd/server
 
-# Runtime
 FROM alpine:3.24
-WORKDIR /app
-COPY --from=builder /app/service-a .
+
+RUN addgroup -S app && adduser -S -G app -H -s /sbin/nologin app
+COPY --from=build /out/service-a /usr/local/bin/service-a
+
+USER app
+# PORT is injected by Cloud Run; 8080 is the local default.
 EXPOSE 8080
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
-  CMD nc -z localhost 8080 || exit 1
-CMD ["./service-a"]
+  CMD wget -q --spider "http://127.0.0.1:${PORT:-8080}/healthz" || exit 1
+
+ENTRYPOINT ["service-a"]

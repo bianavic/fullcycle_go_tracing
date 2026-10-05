@@ -77,3 +77,12 @@ func TestLoad_ReportsAllProblemsAtOnce(t *testing.T) {
 		}
 	}
 }
+
+func TestConfig_String(t *testing.T) {
+	got := Config{Port: "8080", ServiceBURL: "http://b:1", HTTPClientTimeout: 3 * time.Second}.String()
+	for _, want := range []string{"8080", "http://b:1", "3s"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("String() = %q, want it to contain %q", got, want)
+		}
+	}
+}

@@ -26,6 +26,7 @@ type Client struct {
 	http    *http.Client
 }
 
+// NewClient builds a Client. The http.Client carries the request timeout.
 func NewClient(baseURL string, httpClient *http.Client) *Client {
 	return &Client{baseURL: strings.TrimRight(baseURL, "/"), http: httpClient}
 }

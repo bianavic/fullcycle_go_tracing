@@ -6,6 +6,10 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
+
+	"go.opentelemetry.io/otel/trace"
+
+	"service-a/internal/observability/requestid"
 )
 
 const (
@@ -22,6 +26,8 @@ func RequestID(logger *slog.Logger) func(http.Handler) http.Handler {
 			sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
 			start := time.Now()
 
+			next.ServeHTTP(sw, r.WithContext(requestid.With(r.Context(), id)))
+
 			if r.URL.Path == healthPath {
 				return
 			}
@@ -32,15 +38,14 @@ func RequestID(logger *slog.Logger) func(http.Handler) http.Handler {
 				"status", sw.status,
 				"duration_ms", time.Since(start).Milliseconds(),
 			}
-			if sc := r.Context(); sc != nil {
-				attrs = append(attrs, "trace_id", sc)
+			if sc := trace.SpanContextFromContext(r.Context()); sc.HasTraceID() {
+				attrs = append(attrs, "trace_id", sc.TraceID().String())
 			}
 			logger.InfoContext(r.Context(), "request", attrs...)
 		})
 	}
 }
 
-// newRequestID returns an RFC 4122 v4 UUID without an external dependency.
 func newRequestID() string {
 	var b [16]byte
 	if _, err := rand.Read(b[:]); err != nil {
@@ -51,7 +56,6 @@ func newRequestID() string {
 	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }
 
-// statusWriter records the status code so the middleware can log it.
 type statusWriter struct {
 	http.ResponseWriter
 	status int
@@ -62,5 +66,4 @@ func (sw *statusWriter) WriteHeader(code int) {
 	sw.ResponseWriter.WriteHeader(code)
 }
 
-// Unwrap lets http.ResponseController reach the underlying writer.
 func (sw *statusWriter) Unwrap() http.ResponseWriter { return sw.ResponseWriter }

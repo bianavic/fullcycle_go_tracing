@@ -7,8 +7,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"service-a/internal/domain"
-	"service-a/internal/usecase"
 	"strings"
 	"testing"
 
@@ -17,6 +15,9 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"go.opentelemetry.io/otel/trace"
+
+	"service-a/internal/domain"
+	"service-a/internal/usecase"
 )
 
 const (

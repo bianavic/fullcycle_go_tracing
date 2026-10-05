@@ -45,7 +45,8 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
       - OTEL_SERVICE_NAME=service-a
       - OTEL_RESOURCE_ATTRIBUTES=environment=development,service.version=1.0.0
-      - SERVICE_B_TIMEOUT=${SERVICE_B_TIMEOUT:-5s}
+      - SERVICE_B_URL=http://service-b:8081
+      - HTTP_CLIENT_TIMEOUT=${HTTP_CLIENT_TIMEOUT:-15s}
     depends_on:
       otel-collector:
         condition: service_started

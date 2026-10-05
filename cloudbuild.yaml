@@ -1,0 +1,28 @@
+# Builds and pushes one service image to Artifact Registry.
+# The build context is the repo root, so each service's Dockerfile
+# (which does `COPY <service>/ ./`) resolves correctly.
+#
+# Invoked once per service by deploy/cloud-run.sh, e.g.:
+#   gcloud builds submit --config cloudbuild.yaml \
+#     --substitutions=_SERVICE=service-b,_REGION=us-central1,_REPO=weather
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - ${_SERVICE}/Dockerfile
+      - -t
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:latest
+      - .
+
+images:
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:latest
+
+substitutions:
+  _SERVICE: service-a
+  _REGION: us-central1
+  _REPO: weather
+
+options:
+  logging: CLOUD_LOGGING_ONLY

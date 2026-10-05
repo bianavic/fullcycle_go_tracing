@@ -64,8 +64,8 @@ func run(ctx context.Context, logger *slog.Logger, getenv func(string) string) e
 		Handler:           api.NewRouter(handler, logger),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
-		WriteTimeout: cfg.HTTPClientTimeout + 5*time.Second,
-		IdleTimeout:  60 * time.Second,
+		WriteTimeout:      cfg.HTTPClientTimeout + 5*time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
 	serverErr := make(chan error, 1)

@@ -1,75 +1,82 @@
+# Whole ecosystem: service-a → service-b → (ViaCEP, WeatherAPI), traced through
+# the OpenTelemetry Collector into Zipkin.
+#
+#   cp .env.example .env   # set WEATHER_API_KEY
+#   docker compose up --build
+#
+# Host ports: 8080 (service-a, the public entry point) and 9411 (Zipkin UI).
+# Everything else stays on the internal network.
+
+x-hardening: &hardening
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+
 services:
-  # Zipkin for trace visualization
   zipkin:
     image: openzipkin/zipkin:3.6.1
-    ports:
-      - "9411:9411"
     environment:
       - STORAGE_TYPE=mem
+    ports:
+      - "9411:9411"
     healthcheck:
       test: ["CMD-SHELL", "wget --spider -q http://localhost:9411/health || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 10
       start_period: 10s
-    networks:
-      backend:
-        aliases:
-          - zipkin
+    networks: [backend]
 
-  # OpenTelemetry Collector
+  # The contrib image has no shell, so it cannot define a healthcheck;
+  # dependents wait for it with service_started.
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.161.0
     command: ["--config=/etc/otelcol/config.yaml"]
     volumes:
       - ./otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
-    ports:
-      - "4317:4317"   # OTLP gRPC receiver
-      - "4318:4318"   # OTLP HTTP receiver
     depends_on:
       zipkin:
         condition: service_healthy
-    networks:
-      backend:
-        aliases:
-          - otel-collector
+    networks: [backend]
 
-  # Service A - CEP validation and orchestration
-  service-a:
+  service-b:
+    <<: *hardening
     build:
       context: .
-      dockerfile: ./service-a/Dockerfile
+      dockerfile: service-b/Dockerfile
+    environment:
+      - WEATHER_API_KEY=${WEATHER_API_KEY:?set WEATHER_API_KEY in .env (see .env.example)}
+      # Empty means "use the built-in default".
+      - HTTP_CLIENT_TIMEOUT=${SERVICE_B_HTTP_CLIENT_TIMEOUT:-}
+      - VIACEP_BASE_URL=${VIACEP_BASE_URL:-}
+      - WEATHERAPI_BASE_URL=${WEATHERAPI_BASE_URL:-}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_SERVICE_NAME=service-b
+      - OTEL_RESOURCE_ATTRIBUTES=deployment.environment=development,service.version=1.0.0
+    depends_on:
+      otel-collector:
+        condition: service_started
+    networks: [backend]
+
+  service-a:
+    <<: *hardening
+    build:
+      context: .
+      dockerfile: service-a/Dockerfile
     ports:
       - "8080:8080"
     environment:
+      - SERVICE_B_URL=http://service-b:8081
+      - HTTP_CLIENT_TIMEOUT=${SERVICE_A_HTTP_CLIENT_TIMEOUT:-}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
       - OTEL_SERVICE_NAME=service-a
-      - OTEL_RESOURCE_ATTRIBUTES=environment=development,service.version=1.0.0
-      - SERVICE_B_URL=http://service-b:8081
-      - HTTP_CLIENT_TIMEOUT=${HTTP_CLIENT_TIMEOUT:-15s}
+      - OTEL_RESOURCE_ATTRIBUTES=deployment.environment=development,service.version=1.0.0
     depends_on:
+      service-b:
+        condition: service_healthy
       otel-collector:
         condition: service_started
-    networks:
-      - backend
-
-  # Service B - CEP lookup and weather data
-  service-b:
-    build:
-      context: .
-      dockerfile: ./service-b/Dockerfile
-    ports:
-      - "8081:8081"
-    environment:
-      - WEATHER_API_KEY=${WEATHER_API_KEY}
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
-      - OTEL_SERVICE_NAME=service-b
-      - OTEL_RESOURCE_ATTRIBUTES=environment=development,service.version=1.0.0
-    depends_on:
-      otel-collector:
-        condition: service_started
-    networks:
-      - backend
+    networks: [backend]
 
 networks:
   backend:

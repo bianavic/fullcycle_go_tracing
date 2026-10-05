@@ -16,7 +16,7 @@ test:
 	@for s in $(SERVICES); do (cd $$s && go test -race ./...) || exit 1; done
 
 cover:
-	@for s in $(SERVICES); do (cd $$s && go test -race -cover ./...) || exit 1; done
+	bash scripts/check-coverage.sh
 
 vuln:
 	@for s in $(SERVICES); do (cd $$s && govulncheck ./...) || exit 1; done
@@ -32,4 +32,4 @@ down:
 	docker compose down
 
 e2e:
-	./scripts/e2e.sh
+	bash scripts/e2e.sh

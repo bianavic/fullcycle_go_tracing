@@ -209,6 +209,8 @@ echo "http://localhost:9411/zipkin/traces/${TRACE_ID}"   # open this after ~6 se
 
 ### What a trace looks like
 
+<img src="docs/images/zipkin-trace.png" width="880" alt="Zipkin trace: service-a post /weather → service-a http post → service-b post /weather → lookup-cep and lookup-temperature" />
+
 ```
 service-a  post /weather          SERVER   automatic (otelhttp)  — the request reaching Service A
 └─ service-a  http post           CLIENT   automatic (otelhttp)  — the call to Service B

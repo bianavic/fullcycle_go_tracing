@@ -394,59 +394,59 @@ Os itens de entrega marcados como pendentes dependem apenas do merge final na `m
 
 #### Serviço A — Input
 
-- [ ] Expor o Serviço A via HTTP.
-- [ ] Implementar endpoint HTTP `POST`.
-- [ ] Receber o CEP como `string`.
-- [ ] Validar se o CEP contém exatamente 8 dígitos.
-- [ ] Encaminhar CEP válido para o Serviço B via HTTP.
-- [ ] Retornar HTTP `422` para CEP inválido.
-- [ ] Retornar a mensagem `invalid zipcode` para CEP inválido.
+- [x] Expor o Serviço A via HTTP.
+- [x] Implementar endpoint HTTP `POST`.
+- [x] Receber o CEP como `string`.
+- [x] Validar se o CEP contém exatamente 8 dígitos.
+- [x] Encaminhar CEP válido para o Serviço B via HTTP.
+- [x] Retornar HTTP `422` para CEP inválido.
+- [x] Retornar a mensagem `invalid zipcode` para CEP inválido.
 
 #### Serviço B — Orquestração
 
-- [ ] Receber um CEP válido com 8 dígitos.
-- [ ] Consultar uma API externa de localização, como ViaCEP.
-- [ ] Obter o nome da cidade a partir do CEP.
-- [ ] Consultar uma API externa de clima, como WeatherAPI.
-- [ ] Obter a temperatura atual da cidade.
-- [ ] Retornar a temperatura em Celsius.
-- [ ] Retornar a temperatura em Fahrenheit.
-- [ ] Retornar a temperatura em Kelvin.
-- [ ] Retornar a cidade na resposta de sucesso.
-- [ ] Retornar HTTP `200 OK` em caso de sucesso.
-- [ ] Retornar HTTP `422` com a mensagem `invalid zipcode` para CEP com formato inválido.
-- [ ] Retornar HTTP `404` com a mensagem `can not find zipcode` quando o CEP tiver formato válido, mas não for encontrado.
-- [ ] Implementar a conversão de Celsius para Fahrenheit usando `F = C × 1.8 + 32`.
-- [ ] Implementar a conversão de Celsius para Kelvin usando `K = C + 273`.
+- [x] Receber um CEP válido com 8 dígitos.
+- [x] Consultar uma API externa de localização, como ViaCEP.
+- [x] Obter o nome da cidade a partir do CEP.
+- [x] Consultar uma API externa de clima, como WeatherAPI.
+- [x] Obter a temperatura atual da cidade.
+- [x] Retornar a temperatura em Celsius.
+- [x] Retornar a temperatura em Fahrenheit.
+- [x] Retornar a temperatura em Kelvin.
+- [x] Retornar a cidade na resposta de sucesso.
+- [x] Retornar HTTP `200 OK` em caso de sucesso.
+- [x] Retornar HTTP `422` com a mensagem `invalid zipcode` para CEP com formato inválido.
+- [x] Retornar HTTP `404` com a mensagem `can not find zipcode` quando o CEP tiver formato válido, mas não for encontrado.
+- [x] Implementar a conversão de Celsius para Fahrenheit usando `F = C × 1.8 + 32`.
+- [x] Implementar a conversão de Celsius para Kelvin usando `K = C + 273`.
 
 ### Requisitos de observabilidade
 
-- [ ] Instrumentar o Serviço A com OpenTelemetry.
-- [ ] Instrumentar o Serviço B com OpenTelemetry.
-- [ ] Implementar distributed tracing entre os serviços.
-- [ ] Permitir visualizar no Zipkin o fluxo `Request → Serviço A → Serviço B`.
-- [ ] Criar um span manual para a busca do CEP na API externa de localização.
-- [ ] Criar um span manual para a busca da temperatura na API externa de clima.
-- [ ] Utilizar um OTEL Collector para receber os dados de telemetria.
-- [ ] Configurar o OTEL Collector para enviar os traces ao Zipkin.
+- [x] Instrumentar o Serviço A com OpenTelemetry.
+- [x] Instrumentar o Serviço B com OpenTelemetry.
+- [x] Implementar distributed tracing entre os serviços.
+- [x] Permitir visualizar no Zipkin o fluxo `Request → Serviço A → Serviço B`.
+- [x] Criar um span manual para a busca do CEP na API externa de localização.
+- [x] Criar um span manual para a busca da temperatura na API externa de clima.
+- [x] Utilizar um OTEL Collector para receber os dados de telemetria.
+- [x] Configurar o OTEL Collector para enviar os traces ao Zipkin.
 
 ### Infraestrutura e entrega
 
-- [ ] Disponibilizar o projeto para execução via Docker Compose.
-- [ ] Configurar o `docker-compose.yaml`.
-- [ ] Configurar o Docker Compose para iniciar o Serviço A.
-- [ ] Configurar o Docker Compose para iniciar o Serviço B.
-- [ ] Configurar o Docker Compose para iniciar o OTEL Collector.
-- [ ] Configurar o Docker Compose para iniciar o Zipkin.
+- [x] Disponibilizar o projeto para execução via Docker Compose.
+- [x] Configurar o `docker-compose.yaml`.
+- [x] Configurar o Docker Compose para iniciar o Serviço A.
+- [x] Configurar o Docker Compose para iniciar o Serviço B.
+- [x] Configurar o Docker Compose para iniciar o OTEL Collector.
+- [x] Configurar o Docker Compose para iniciar o Zipkin.
 
 ### Entregáveis
 
-- [ ] Disponibilizar o código-fonte do Serviço A.
-- [ ] Disponibilizar o código-fonte do Serviço B.
-- [ ] Disponibilizar o arquivo `docker-compose.yaml`.
-- [ ] Disponibilizar documentação com instruções para realizar uma requisição `POST` no Serviço A — [API](#api).
-- [ ] Disponibilizar documentação com instruções para acessar o Zipkin — [Viewing traces in Zipkin](#viewing-traces-in-zipkin).
-- [ ] Disponibilizar documentação com instruções para visualizar os traces no Zipkin — [Viewing traces in Zipkin](#viewing-traces-in-zipkin).
+- [x] Disponibilizar o código-fonte do Serviço A.
+- [x] Disponibilizar o código-fonte do Serviço B.
+- [x] Disponibilizar o arquivo `docker-compose.yaml`.
+- [x] Disponibilizar documentação com instruções para realizar uma requisição `POST` no Serviço A — [API](#api).
+- [x] Disponibilizar documentação com instruções para acessar o Zipkin — [Viewing traces in Zipkin](#viewing-traces-in-zipkin).
+- [x] Disponibilizar documentação com instruções para visualizar os traces no Zipkin — [Viewing traces in Zipkin](#viewing-traces-in-zipkin).
 
 ### Cumprimento das regras de entrega
 

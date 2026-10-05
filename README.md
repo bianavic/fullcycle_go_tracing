@@ -20,7 +20,6 @@ OpenTelemetry, through an OTEL Collector, into Zipkin.
 - [Architecture](#architecture)
 - [Development and tests](#development-and-tests)
 - [Troubleshooting](#troubleshooting)
-- [Deploy to Google Cloud Run](#deploy-to-google-cloud-run)
 - [External APIs and conversions](#external-apis-and-conversions)
 - [Challenge requirements (coverage)](#challenge-requirements-coverage)
 
@@ -253,11 +252,11 @@ Copy `.env.example` to `.env`; `docker compose` reads it automatically. Only `WE
 
 Keep the Service A timeout above twice the Service B timeout: Service B makes two calls in sequence.
 
-What `docker-compose.yaml` passes into the containers (useful outside Compose, e.g. Cloud Run):
+What `docker-compose.yaml` passes into the containers (useful to run a service outside Compose):
 
 | Container variable              | Service | Default                  | Meaning                                                        |
 |---------------------------------|---------|--------------------------|----------------------------------------------------------------|
-| `PORT`                          | A / B   | `8080` / `8081`          | Listen port (Cloud Run injects it)                             |
+| `PORT`                          | A / B   | `8080` / `8081`          | Listen port                                                    |
 | `SERVICE_B_URL`                 | A       | `http://service-b:8081`  | Where Service A reaches Service B                              |
 | `HTTP_CLIENT_TIMEOUT`           | A / B   | `15s` / `5s`             | Outgoing HTTP timeout                                          |
 | `WEATHER_API_KEY`               | B       | — (required)             | WeatherAPI key                                                 |
@@ -296,8 +295,7 @@ Each service is an independent Go module following Clean Architecture; dependenc
 ├── .env.example                    # template for .env (WEATHER_API_KEY and optional overrides)
 ├── Makefile · go.work · .golangci.yml  # dev commands, Go workspace, linter config
 ├── scripts/                        # used by make e2e and make cover
-├── docs/                           # CHALLENGE.md (original brief), DEPLOY.md, images/zipkin-trace.png
-└── deploy/ · cloudbuild.yaml       # Google Cloud Run
+└── docs/                           # CHALLENGE.md (original brief), images/zipkin-trace.png
 ```
 
 `api → usecase → domain`, and `infra → usecase (ports) + domain`. The use cases return **domain errors**
@@ -359,22 +357,6 @@ docker compose logs -f service-a        # follow one service (swap for service-b
 docker compose up --build service-a     # rebuild and restart a single service
 docker compose down -v                  # stop and remove containers and volumes
 ```
-
-## Deploy to Google Cloud Run
-
-Both services can be deployed to Cloud Run (`service-b` first, then `service-a` pointed at it through `SERVICE_B_URL`).
-
-```bash
-PROJECT_ID=<your-project> WEATHER_API_KEY=<your-weatherapi-key> bash deploy/cloud-run.sh
-```
-
-The script prints a ready-to-run `curl -X POST …/weather` command at the end. See **[docs/DEPLOY.md](docs/DEPLOY.md)**
-for prerequisites and production notes. Tracing is inactive on Cloud Run unless `OTEL_EXPORTER_OTLP_ENDPOINT` points to
-a reachable collector.
-
-> An earlier deployment of this project (`https://service-a-edxtn7ad3q-uc.a.run.app`) still serves the **old**
-> `GET /zipcode/{cep}` contract. It is not updated by this repository; run the script above to publish the current
-> `POST /weather` API.
 
 ## External APIs and conversions
 

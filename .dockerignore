@@ -8,7 +8,6 @@ bin
 docs
 *.md
 *.png
-deploy
 Makefile
 docker-compose.yaml
 otel-collector-config.yaml

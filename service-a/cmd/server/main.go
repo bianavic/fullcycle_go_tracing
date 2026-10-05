@@ -1,10 +1,6 @@
 package main
 
 import (
-	"bianavic/fullcycle_go_tracing/internal/api"
-	"bianavic/fullcycle_go_tracing/internal/config"
-	"bianavic/fullcycle_go_tracing/internal/infra/serviceb"
-	"bianavic/fullcycle_go_tracing/internal/usecase"
 	"context"
 	"errors"
 	"log/slog"
@@ -13,6 +9,14 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+
+	"service-a/internal/api"
+	"service-a/internal/config"
+	"service-a/internal/infra/serviceb"
+	"service-a/internal/observability/telemetry"
+	"service-a/internal/usecase"
 )
 
 const shutdownTimeout = 5 * time.Second
@@ -21,28 +25,37 @@ func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
 
-	if err := run(logger); err != nil {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	if err := run(ctx, logger, os.Getenv); err != nil {
 		logger.Error("service-a failed", "error", err)
 		os.Exit(1)
 	}
 }
 
-func run(logger *slog.Logger) error {
-	cfg, err := config.Load(os.Getenv)
+func run(ctx context.Context, logger *slog.Logger, getenv func(string) string) error {
+	cfg, err := config.Load(getenv)
 	if err != nil {
 		return err
 	}
 
+	shutdownTracing, err := telemetry.Init(ctx, "service-a")
 	if err != nil {
 		return err
 	}
 	defer func() {
-		_, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
+		if err := shutdownTracing(ctx); err != nil {
+			logger.Warn("flush traces", "error", err)
+		}
 	}()
 
+	// The otelhttp transport injects the W3C traceparent into calls to service-b.
 	httpClient := &http.Client{
-		Timeout: cfg.HTTPClientTimeout,
+		Timeout:   cfg.HTTPClientTimeout,
+		Transport: otelhttp.NewTransport(http.DefaultTransport),
 	}
 	gateway := serviceb.NewClient(cfg.ServiceBURL, httpClient)
 	handler := api.NewHandler(usecase.NewRequestWeather(gateway), logger)
@@ -52,8 +65,9 @@ func run(logger *slog.Logger) error {
 		Handler:           api.NewRouter(handler, logger),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
-		WriteTimeout:      cfg.HTTPClientTimeout + 5*time.Second,
-		IdleTimeout:       60 * time.Second,
+		// Must outlast the call to service-b plus processing.
+		WriteTimeout: cfg.HTTPClientTimeout + 5*time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 
 	serverErr := make(chan error, 1)
@@ -64,16 +78,14 @@ func run(logger *slog.Logger) error {
 		}
 	}()
 
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	select {
 	case err := <-serverErr:
 		return err
-	case sig := <-stop:
-		logger.Info("shutting down", "signal", sig.String())
+	case <-ctx.Done():
+		logger.Info("shutting down")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	drainCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
-	return srv.Shutdown(ctx)
+	return srv.Shutdown(drainCtx)
 }

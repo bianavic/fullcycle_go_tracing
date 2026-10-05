@@ -2,12 +2,17 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+
+	"service-b/internal/observability/requestid"
 )
 
 func logRecords(t *testing.T, buf *bytes.Buffer) []map[string]any {
@@ -36,6 +41,18 @@ func runMiddleware(t *testing.T, req *http.Request, next http.HandlerFunc) (*htt
 }
 
 func TestRequestID_GeneratesWhenAbsent(t *testing.T) {
+	var inCtx string
+	rec, _ := runMiddleware(t, httptest.NewRequest(http.MethodGet, "/x", nil), func(_ http.ResponseWriter, r *http.Request) {
+		inCtx = requestid.FromContext(r.Context())
+	})
+
+	got := rec.Header().Get("X-Request-Id")
+	if got == "" || got != inCtx {
+		t.Errorf("header = %q, context = %q; want equal and non-empty", got, inCtx)
+	}
+	if len(got) != 36 || got[14] != '4' {
+		t.Errorf("generated id %q is not a UUIDv4", got)
+	}
 }
 
 func TestRequestID_ReusesValidCallerID(t *testing.T) {
@@ -91,6 +108,17 @@ func TestRequestID_LogsOneStructuredLine(t *testing.T) {
 }
 
 func TestRequestID_LogsTraceIDFromContext(t *testing.T) {
+	tp := sdktrace.NewTracerProvider()
+	defer func() { _ = tp.Shutdown(context.Background()) }()
+	ctx, span := tp.Tracer("t").Start(context.Background(), "server")
+	defer span.End()
+
+	req := httptest.NewRequest(http.MethodGet, "/x", nil).WithContext(ctx)
+	_, buf := runMiddleware(t, req, func(http.ResponseWriter, *http.Request) {})
+
+	if got := logRecords(t, buf)[0]["trace_id"]; got != span.SpanContext().TraceID().String() {
+		t.Errorf("trace_id = %v, want %s", got, span.SpanContext().TraceID())
+	}
 }
 
 func TestRequestID_DefaultStatusIs200(t *testing.T) {

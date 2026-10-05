@@ -1,11 +1,6 @@
 package main
 
 import (
-	"bianavic/fullcycle_go_tracing/internal/api"
-	"bianavic/fullcycle_go_tracing/internal/config"
-	"bianavic/fullcycle_go_tracing/internal/infra/viacep"
-	"bianavic/fullcycle_go_tracing/internal/infra/weatherapi"
-	"bianavic/fullcycle_go_tracing/internal/usecase"
 	"context"
 	"errors"
 	"log/slog"
@@ -14,6 +9,16 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
+
+	"service-b/internal/api"
+	"service-b/internal/config"
+	"service-b/internal/infra/viacep"
+	"service-b/internal/infra/weatherapi"
+	"service-b/internal/observability/telemetry"
+	"service-b/internal/usecase"
 )
 
 const shutdownTimeout = 5 * time.Second
@@ -34,15 +39,31 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 
+	shutdownTracing, err := telemetry.Init(context.Background(), "service-b")
+	if err != nil {
+		return err
+	}
+	// Flush pending spans on the way out, including when startup fails below.
 	defer func() {
-		_, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
+		if err := shutdownTracing(ctx); err != nil {
+			logger.Warn("flush traces", "error", err)
+		}
 	}()
 
 	// Composition root: the only place that knows the concrete adapters.
-	httpClient := &http.Client{Timeout: cfg.HTTPClientTimeout}
-	location := viacep.NewClient(cfg.ViaCEPBaseURL, httpClient)
-	weather := weatherapi.NewClient(cfg.WeatherAPIBaseURL, cfg.WeatherAPIKey, httpClient)
+	tracer := otel.Tracer("service-b")
+	// ViaCEP calls get an automatic client span under lookup-cep. WeatherAPI
+	// calls deliberately do not: its key travels in the query string and the
+	// otelhttp client span would record the full URL (url.full) with it.
+	viaCEPHTTP := &http.Client{
+		Timeout:   cfg.HTTPClientTimeout,
+		Transport: otelhttp.NewTransport(http.DefaultTransport),
+	}
+	weatherHTTP := &http.Client{Timeout: cfg.HTTPClientTimeout}
+	location := viacep.NewClient(cfg.ViaCEPBaseURL, viaCEPHTTP, tracer)
+	weather := weatherapi.NewClient(cfg.WeatherAPIBaseURL, cfg.WeatherAPIKey, weatherHTTP, tracer)
 	handler := api.NewHandler(usecase.NewGetWeatherByCEP(location, weather), logger)
 
 	srv := &http.Server{

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"bianavic/fullcycle_go_tracing/internal/domain"
+	"service-b/internal/domain"
 )
 
 type fakeLocation struct {

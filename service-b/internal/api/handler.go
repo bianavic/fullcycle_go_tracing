@@ -8,8 +8,9 @@ import (
 	"log/slog"
 	"net/http"
 
-	"bianavic/fullcycle_go_tracing/internal/domain"
-	"bianavic/fullcycle_go_tracing/internal/usecase"
+	"service-b/internal/domain"
+	"service-b/internal/observability/requestid"
+	"service-b/internal/usecase"
 )
 
 const maxBodyBytes = 1 << 10
@@ -44,6 +45,7 @@ func NewHandler(uc WeatherUseCase, logger *slog.Logger) *Handler {
 	return &Handler{uc: uc, logger: logger}
 }
 
+// PostWeather handles POST /weather with body {"cep": "<8 digits>"}.
 func (h *Handler) PostWeather(w http.ResponseWriter, r *http.Request) {
 	cep, err := decodeCEP(w, r)
 	if err != nil {
@@ -88,6 +90,8 @@ func classifyDecodeError(err error) error {
 	return domain.ErrInvalidZipcode
 }
 
+// writeError maps an error to its HTTP response. The client only ever sees a
+// fixed message; details go to the log.
 func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, errBodyTooLarge):
@@ -97,10 +101,10 @@ func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, err error) 
 	case errors.Is(err, domain.ErrZipcodeNotFound):
 		h.writeJSON(w, r, http.StatusNotFound, errorResponse{"can not find zipcode"})
 	case errors.Is(err, domain.ErrUpstream):
-		h.logger.WarnContext(r.Context(), "upstream failure", "error", err)
+		h.logger.WarnContext(r.Context(), "upstream failure", "error", err, "request_id", requestid.FromContext(r.Context()))
 		h.writeJSON(w, r, http.StatusBadGateway, errorResponse{"upstream service unavailable"})
 	default:
-		h.logger.ErrorContext(r.Context(), "unexpected error", "error", err)
+		h.logger.ErrorContext(r.Context(), "unexpected error", "error", err, "request_id", requestid.FromContext(r.Context()))
 		h.writeJSON(w, r, http.StatusInternalServerError, errorResponse{"internal server error"})
 	}
 }
@@ -109,6 +113,6 @@ func (h *Handler) writeJSON(w http.ResponseWriter, r *http.Request, status int, 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(v); err != nil {
-		h.logger.ErrorContext(r.Context(), "write response", "error", err)
+		h.logger.ErrorContext(r.Context(), "write response", "error", err, "request_id", requestid.FromContext(r.Context()))
 	}
 }

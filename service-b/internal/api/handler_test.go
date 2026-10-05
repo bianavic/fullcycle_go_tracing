@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"bianavic/fullcycle_go_tracing/internal/domain"
-	"bianavic/fullcycle_go_tracing/internal/usecase"
+	"service-b/internal/domain"
+	"service-b/internal/usecase"
 )
 
 type fakeUseCase struct {

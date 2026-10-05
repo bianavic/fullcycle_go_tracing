@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"time"
 
-	"bianavic/fullcycle_go_tracing/internal/infra/viacep"
-	"bianavic/fullcycle_go_tracing/internal/infra/weatherapi"
+	"service-b/internal/infra/viacep"
+	"service-b/internal/infra/weatherapi"
 )
 
 // Config holds every runtime setting of service-b. OpenTelemetry settings are

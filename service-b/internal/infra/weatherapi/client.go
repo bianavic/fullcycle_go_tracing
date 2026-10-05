@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"bianavic/fullcycle_go_tracing/internal/domain"
+	"service-b/internal/domain"
 )
 
 const (

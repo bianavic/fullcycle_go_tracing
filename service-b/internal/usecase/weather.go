@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"bianavic/fullcycle_go_tracing/internal/domain"
+	"service-b/internal/domain"
 )
 
+// LocationProvider resolves the city that owns a CEP.
 type LocationProvider interface {
 	FindCityByCEP(ctx context.Context, cep domain.CEP) (string, error)
 }

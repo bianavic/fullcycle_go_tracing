@@ -3,7 +3,6 @@
 ![Go](https://img.shields.io/badge/Go-1.27-00ADD8?logo=go&logoColor=white)
 ![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-Tracing-f5a800?logo=opentelemetry&logoColor=white)
 ![Zipkin](https://img.shields.io/badge/Zipkin-9411-981093?logo=zipkin&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-green.svg)
 
 > This project is part of the [FullCycle](https://fullcycle.com.br/) learning program (Pós-Graduação).
 
@@ -23,8 +22,7 @@ OpenTelemetry, through an OTEL Collector, into Zipkin.
 - [Troubleshooting](#troubleshooting)
 - [Deploy to Google Cloud Run](#deploy-to-google-cloud-run)
 - [External APIs and conversions](#external-apis-and-conversions)
-- [Requisitos do desafio (cobertura)](#requisitos-do-desafio-cobertura)
-- [License](#license)
+- [Challenge requirements (coverage)](#challenge-requirements-coverage)
 
 ## What the system does
 
@@ -60,8 +58,8 @@ Only `8080` and `9411` are published on the host; everything else stays on the i
 1. Clone the repository
 
    ```bash
-   git clone https://github.com/bianavic/fullcycle_tracing.git
-   cd fullcycle_tracing
+   git clone https://github.com/bianavic/fullcycle_go_tracing.git
+   cd fullcycle_go_tracing
    ```
 
 2. Configure the API key (see [Configuration](#configuration) for every variable)
@@ -294,8 +292,11 @@ Each service is an independent Go module following Clean Architecture; dependenc
 │       ├── infra/weatherapi/       # adapter: WeatherAPI client (manual span lookup-temperature)
 │       └── api/ · observability/
 ├── docker-compose.yaml             # Service A, Service B, OTEL Collector, Zipkin
-├── otel-collector-config.yaml      # OTLP in → batch → Zipkin out
+├── otel-collector-config.yaml      # OTLP in → memory_limiter + batch → Zipkin out
+├── .env.example                    # template for .env (WEATHER_API_KEY and optional overrides)
+├── Makefile · go.work · .golangci.yml  # dev commands, Go workspace, linter config
 ├── scripts/                        # used by make e2e and make cover
+├── docs/                           # CHALLENGE.md (original brief), DEPLOY.md, images/zipkin-trace.png
 └── deploy/ · cloudbuild.yaml       # Google Cloud Run
 ```
 
@@ -385,76 +386,76 @@ a reachable collector.
 - Celsius → Fahrenheit: `F = C × 1.8 + 32`
 - Celsius → Kelvin: `K = C + 273`
 
-## Requisitos do desafio (cobertura)
+## Challenge requirements (coverage)
 
-Mapeamento da implementação para o enunciado original — veja **[docs/CHALLENGE.md](docs/CHALLENGE.md)**.
-Os itens de entrega marcados como pendentes dependem apenas do merge final na `main`.
+How the implementation maps to the original brief — see **[docs/CHALLENGE.md](docs/CHALLENGE.md)** (in Portuguese).
+The delivery item still pending depends only on the final merge into `main`.
 
-### Requisitos técnicos
+### Technical requirements
 
-#### Serviço A — Input
+#### Service A — Input
 
-- [x] Expor o Serviço A via HTTP.
-- [x] Implementar endpoint HTTP `POST`.
-- [x] Receber o CEP como `string`.
-- [x] Validar se o CEP contém exatamente 8 dígitos.
-- [x] Encaminhar CEP válido para o Serviço B via HTTP.
-- [x] Retornar HTTP `422` para CEP inválido.
-- [x] Retornar a mensagem `invalid zipcode` para CEP inválido.
+- [x] Expose Service A over HTTP.
+- [x] Implement an HTTP `POST` endpoint.
+- [x] Receive the CEP as a `string`.
+- [x] Validate that the CEP has exactly 8 digits.
+- [x] Forward a valid CEP to Service B over HTTP.
+- [x] Return HTTP `422` for an invalid CEP.
+- [x] Return the message `invalid zipcode` for an invalid CEP.
 
-#### Serviço B — Orquestração
+#### Service B — Orchestration
 
-- [x] Receber um CEP válido com 8 dígitos.
-- [x] Consultar uma API externa de localização, como ViaCEP.
-- [x] Obter o nome da cidade a partir do CEP.
-- [x] Consultar uma API externa de clima, como WeatherAPI.
-- [x] Obter a temperatura atual da cidade.
-- [x] Retornar a temperatura em Celsius.
-- [x] Retornar a temperatura em Fahrenheit.
-- [x] Retornar a temperatura em Kelvin.
-- [x] Retornar a cidade na resposta de sucesso.
-- [x] Retornar HTTP `200 OK` em caso de sucesso.
-- [x] Retornar HTTP `422` com a mensagem `invalid zipcode` para CEP com formato inválido.
-- [x] Retornar HTTP `404` com a mensagem `can not find zipcode` quando o CEP tiver formato válido, mas não for encontrado.
-- [x] Implementar a conversão de Celsius para Fahrenheit usando `F = C × 1.8 + 32`.
-- [x] Implementar a conversão de Celsius para Kelvin usando `K = C + 273`.
+- [x] Receive a valid 8-digit CEP.
+- [x] Query an external location API, such as ViaCEP.
+- [x] Get the city name from the CEP.
+- [x] Query an external weather API, such as WeatherAPI.
+- [x] Get the city's current temperature.
+- [x] Return the temperature in Celsius.
+- [x] Return the temperature in Fahrenheit.
+- [x] Return the temperature in Kelvin.
+- [x] Return the city in the success response.
+- [x] Return HTTP `200 OK` on success.
+- [x] Return HTTP `422` with the message `invalid zipcode` for a badly formatted CEP.
+- [x] Return HTTP `404` with the message `can not find zipcode` when the CEP is well formed but not found.
+- [x] Convert Celsius to Fahrenheit with `F = C × 1.8 + 32`.
+- [x] Convert Celsius to Kelvin with `K = C + 273`.
 
-### Requisitos de observabilidade
+### Observability requirements
 
-- [x] Instrumentar o Serviço A com OpenTelemetry.
-- [x] Instrumentar o Serviço B com OpenTelemetry.
-- [x] Implementar distributed tracing entre os serviços.
-- [x] Permitir visualizar no Zipkin o fluxo `Request → Serviço A → Serviço B`.
-- [x] Criar um span manual para a busca do CEP na API externa de localização.
-- [x] Criar um span manual para a busca da temperatura na API externa de clima.
-- [x] Utilizar um OTEL Collector para receber os dados de telemetria.
-- [x] Configurar o OTEL Collector para enviar os traces ao Zipkin.
+- [x] Instrument Service A with OpenTelemetry.
+- [x] Instrument Service B with OpenTelemetry.
+- [x] Implement distributed tracing across the services.
+- [x] Show the `Request → Service A → Service B` flow in Zipkin.
+- [x] Create a manual span for the CEP lookup in the external location API.
+- [x] Create a manual span for the temperature lookup in the external weather API.
+- [x] Use an OTEL Collector to receive the telemetry.
+- [x] Configure the OTEL Collector to send the traces to Zipkin.
 
-### Infraestrutura e entrega
+### Infrastructure
 
-- [x] Disponibilizar o projeto para execução via Docker Compose.
-- [x] Configurar o `docker-compose.yaml`.
-- [x] Configurar o Docker Compose para iniciar o Serviço A.
-- [x] Configurar o Docker Compose para iniciar o Serviço B.
-- [x] Configurar o Docker Compose para iniciar o OTEL Collector.
-- [x] Configurar o Docker Compose para iniciar o Zipkin.
+- [x] Make the project runnable with Docker Compose.
+- [x] Configure `docker-compose.yaml`.
+- [x] Configure Docker Compose to start Service A.
+- [x] Configure Docker Compose to start Service B.
+- [x] Configure Docker Compose to start the OTEL Collector.
+- [x] Configure Docker Compose to start Zipkin.
 
-### Entregáveis
+### Deliverables
 
-- [x] Disponibilizar o código-fonte do Serviço A.
-- [x] Disponibilizar o código-fonte do Serviço B.
-- [x] Disponibilizar o arquivo `docker-compose.yaml`.
-- [x] Disponibilizar documentação com instruções para realizar uma requisição `POST` no Serviço A — [API](#api).
-- [x] Disponibilizar documentação com instruções para acessar o Zipkin — [Viewing traces in Zipkin](#viewing-traces-in-zipkin).
-- [x] Disponibilizar documentação com instruções para visualizar os traces no Zipkin — [Viewing traces in Zipkin](#viewing-traces-in-zipkin).
+- [x] Provide the source code of Service A.
+- [x] Provide the source code of Service B.
+- [x] Provide the `docker-compose.yaml` file.
+- [x] Document how to send a `POST` request to Service A — [API](#api).
+- [x] Document how to open Zipkin — [Viewing traces in Zipkin](#viewing-traces-in-zipkin).
+- [x] Document how to view the traces in Zipkin — [Viewing traces in Zipkin](#viewing-traces-in-zipkin).
 
-### Cumprimento das regras de entrega
+### Delivery rules
 
-- [x] Manter o repositório exclusivo para o projeto do desafio.
-- [x] Garantir que o repositório contenha apenas o projeto em questão.
-- [ ] Manter todo o código na branch `main`.
+- [x] Keep the repository dedicated to the challenge project.
+- [x] Make sure the repository contains only this project.
+- [ ] Keep all the code on the `main` branch.
 
-> **Nota sobre o Kelvin:** o exemplo do enunciado mostra `301.65` para 28,5 °C (isto é, `C + 273,15`), mas a fórmula
-> indicada é `K = C + 273`. Este projeto segue a **fórmula** (28,5 °C → `301.5`).
+> **Note on Kelvin:** the brief's example shows `301.65` for 28.5 °C (that is, `C + 273.15`), but the stated formula is
+> `K = C + 273`. This project follows the **formula** (28.5 °C → `301.5`).
 
 ---

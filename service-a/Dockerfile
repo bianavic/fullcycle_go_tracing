@@ -18,7 +18,7 @@ RUN addgroup -S app && adduser -S -G app -H -s /sbin/nologin app
 COPY --from=build /out/service-a /usr/local/bin/service-a
 
 USER app
-# PORT is injected by Cloud Run; 8080 is the local default.
+# PORT overrides the listen port; 8080 is the default.
 EXPOSE 8080
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
   CMD wget -q --spider "http://127.0.0.1:${PORT:-8080}/healthz" || exit 1

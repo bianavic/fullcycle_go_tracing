@@ -1,0 +1,41 @@
+version: "2"
+
+run:
+  timeout: 3m
+
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - gosec
+    - noctx
+    - revive
+  settings:
+    revive:
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: if-return
+        - name: increment-decrement
+        - name: var-declaration
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: unexported-return
+        - name: indent-error-flow
+        - name: errorf
+        - name: superfluous-else
+        - name: unreachable-code
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - gosec
+          - noctx
+
+formatters:
+  enable:
+    - gofmt

@@ -1,0 +1,14 @@
+# The build context is the repository root; send only what the images need.
+.git
+.idea
+.vscode
+.claude
+.env
+bin
+docs
+*.md
+*.png
+deploy
+Makefile
+docker-compose.yaml
+otel-collector-config.yaml
